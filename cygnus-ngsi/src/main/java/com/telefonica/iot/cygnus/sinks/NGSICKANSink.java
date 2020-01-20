@@ -60,6 +60,14 @@ public class NGSICKANSink extends NGSISink {
     private String ckanViewer;
     private CKANBackend persistenceBackend;
 
+    private boolean attrNativeTypes;
+
+    private static final String DEFAULT_ATTR_NATIVE_TYPES = "false";
+    private static final String OPEN_ENTITY_CHAR = "(";
+    private static final String CLOSE_ENTITY_CHAR = ")";
+    private static final String SEPARATOR_CHAR = ",";
+    private static final String QUOTATION_MARK_CHAR = "";
+
     /**
      * Constructor.
      */
@@ -193,6 +201,12 @@ public class NGSICKANSink extends NGSISink {
             LOGGER.warn("[" + this.getName() + "] Invalid configuration (ssl="
                 + sslStr + ") -- Must be 'true' or 'false'");
         }  // if else
+
+        String attrNativeTypesStr = context.getString("attr_native_types", DEFAULT_ATTR_NATIVE_TYPES);
+        if (attrNativeTypesStr.equals("true") || attrNativeTypesStr.equals("false")) {
+            attrNativeTypes = Boolean.valueOf(attrNativeTypesStr);
+            LOGGER.debug("[" + this.getName() + "] Reading configuration (attr_native_types=" + attrNativeTypesStr + ")");
+        }
         
         backendMaxConns = context.getInteger("backend.max_conns", 500);
         LOGGER.debug("[" + this.getName() + "] Reading configuration (backend.max_conns=" + backendMaxConns + ")");
@@ -317,7 +331,7 @@ public class NGSICKANSink extends NGSISink {
     /**
      * Class for aggregating fieldValues.
      */
-    private abstract class CKANAggregator {
+    protected abstract class CKANAggregator {
 
         // string containing the data records
         protected String records;
@@ -380,7 +394,7 @@ public class NGSICKANSink extends NGSISink {
     /**
      * Class for aggregating batches in row mode.
      */
-    private class RowAggregator extends CKANAggregator {
+    protected class RowAggregator extends CKANAggregator {
 
         @Override
         public void initialize(NGSIEvent event) throws CygnusBadConfiguration {
@@ -442,7 +456,7 @@ public class NGSICKANSink extends NGSISink {
     /**
      * Class for aggregating batches in column mode.
      */
-    private class ColumnAggregator extends CKANAggregator {
+    protected class ColumnAggregator extends CKANAggregator {
 
         @Override
         public void initialize(NGSIEvent event) throws CygnusBadConfiguration {
@@ -499,7 +513,7 @@ public class NGSICKANSink extends NGSISink {
 
     } // ColumnAggregator
 
-    private CKANAggregator getAggregator(boolean rowAttrPersistence) {
+    protected CKANAggregator getAggregator(boolean rowAttrPersistence) {
         if (rowAttrPersistence) {
             return new RowAggregator();
         } else {
