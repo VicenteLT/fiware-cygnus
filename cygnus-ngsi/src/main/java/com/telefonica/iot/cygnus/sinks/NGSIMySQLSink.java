@@ -52,6 +52,10 @@ public class NGSIMySQLSink extends NGSISink {
     private static final String DEFAULT_USER_NAME = "root";
     private static final int DEFAULT_MAX_POOL_SIZE = 3;
     private static final String DEFAULT_ATTR_NATIVE_TYPES = "false";
+    private static final String OPEN_ENTITY_CHAR = "(";
+    private static final String CLOSE_ENTITY_CHAR = ")";
+    private static final String SEPARATOR_CHAR = ",";
+    private static final String QUOTATION_MARK_CHAR = "";
 
     private static final CygnusLogger LOGGER = new CygnusLogger(NGSIMySQLSink.class);
     private String mysqlHost;
@@ -374,7 +378,7 @@ public class NGSIMySQLSink extends NGSISink {
         throws CygnusPersistenceError, CygnusRuntimeError, CygnusBadContextData {
         String fieldsForCreate = aggregator.getFieldsForCreate();
         String fieldsForInsert = aggregator.getFieldsForInsert();
-        String valuesForInsert = aggregator.getValuesForInsert();
+        String valuesForInsert = aggregator.getValuesForInsert(OPEN_ENTITY_CHAR, CLOSE_ENTITY_CHAR, SEPARATOR_CHAR, QUOTATION_MARK_CHAR);
         String dbName = aggregator.getDbName(enableLowercase);
         String tableName = aggregator.getTableName(enableLowercase);
         

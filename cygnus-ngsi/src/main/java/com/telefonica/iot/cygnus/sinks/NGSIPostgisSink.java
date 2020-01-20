@@ -67,6 +67,10 @@ public class NGSIPostgisSink extends NGSISink {
     private static final int DEFAULT_MAX_POOL_SIZE = 3;
     private static final String DEFAULT_POSTGIS_TYPE = "geometry";
     private static final String DEFAULT_ATTR_NATIVE_TYPES = "false";
+    private static final String OPEN_ENTITY_CHAR = "(";
+    private static final String CLOSE_ENTITY_CHAR = ")";
+    private static final String SEPARATOR_CHAR = ",";
+    private static final String QUOTATION_MARK_CHAR = "";
 
     private static final CygnusLogger LOGGER = new CygnusLogger(NGSIPostgisSink.class);
     private String postgisHost;
@@ -287,7 +291,7 @@ public class NGSIPostgisSink extends NGSISink {
                 aggregator.aggregate(event);
             } // for
             LOGGER.debug("[" + getName() + "] adding event to aggregator object  (name=" + aggregator.getFieldsForInsert()+ ", values="
-                    + aggregator.getValuesForInsert() + ")");
+                    + aggregator.getValuesForInsert(OPEN_ENTITY_CHAR, CLOSE_ENTITY_CHAR, SEPARATOR_CHAR, QUOTATION_MARK_CHAR) + ")");
 
             // persist the fieldValues
             persistAggregation(aggregator);
@@ -384,7 +388,7 @@ public class NGSIPostgisSink extends NGSISink {
     private void persistAggregation(NGSIGenericAggregator aggregator) throws CygnusPersistenceError, CygnusRuntimeError, CygnusBadContextData {
         String fieldsForCreate = aggregator.getFieldsForCreate();
         String fieldsForInsert = aggregator.getFieldsForInsert();
-        String valuesForInsert = aggregator.getValuesForInsert();
+        String valuesForInsert = aggregator.getValuesForInsert(OPEN_ENTITY_CHAR, CLOSE_ENTITY_CHAR, SEPARATOR_CHAR, QUOTATION_MARK_CHAR);
         String schemaName = aggregator.getDbName(enableLowercase);
         String tableName = aggregator.getTableName(enableLowercase);
 

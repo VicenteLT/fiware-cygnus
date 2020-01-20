@@ -52,6 +52,12 @@ import org.mockito.runners.MockitoJUnitRunner;
 @RunWith(MockitoJUnitRunner.class)
 public class NGSIPostgisSinkTest {
 
+
+    public static final String OPEN_ENTITY_CHAR = "(";
+    public static final String CLOSE_ENTITY_CHAR = ")";
+    public static final String SEPARATOR_CHAR = ",";
+    public static final String QUOTATION_MARK_CHAR = "'";
+
     /**
      * Constructor.
      */
@@ -1027,18 +1033,19 @@ public class NGSIPostgisSinkTest {
         NGSIEvent ngsiEvent = new NGSIEvent(headers, contextElement.toString().getBytes(), contextElement, null);
         columnAggregator.initialize(ngsiEvent);
         columnAggregator.aggregate(ngsiEvent);
-        System.out.println(columnAggregator.getValuesForInsert());
-        if (columnAggregator.getValuesForInsert().contains("2,'[]'")  &&
-                columnAggregator.getValuesForInsert().contains("TRUE,'[]'")  &&
-                columnAggregator.getValuesForInsert().contains("'2016-09-21T01:23:00.00Z'")  &&
-                columnAggregator.getValuesForInsert().contains("ST_GeomFromGeoJSON('\"{\"type\": \"Point\",\"coordinates\": [-0.036177,39.986159]}\"')")  &&
-                columnAggregator.getValuesForInsert().contains("{\"String\": \"string\"}")  &&
-                columnAggregator.getValuesForInsert().contains("foo")) {
+        String valuesForInsert = columnAggregator.getValuesForInsert(OPEN_ENTITY_CHAR, CLOSE_ENTITY_CHAR, SEPARATOR_CHAR, QUOTATION_MARK_CHAR);
+        System.out.println(valuesForInsert);
+        if (valuesForInsert.contains("2,'[]'")  &&
+                valuesForInsert.contains("TRUE,'[]'")  &&
+                valuesForInsert.contains("'2016-09-21T01:23:00.00Z'")  &&
+                valuesForInsert.contains("ST_GeomFromGeoJSON('\"{\"type\": \"Point\",\"coordinates\": [-0.036177,39.986159]}\"')")  &&
+                valuesForInsert.contains("{\"String\": \"string\"}")  &&
+                valuesForInsert.contains("foo")) {
             System.out.println(getTestTraceHead("[NGSIPostgisSink.testNativeTypesColumn]")
                     + "-  OK  - NativeTypesOK");
             assertTrue(true);
         } else {
-            System.out.println(columnAggregator.getValuesForInsert());
+            System.out.println(valuesForInsert);
             assertFalse(true);
         }
     }
@@ -1069,17 +1076,18 @@ public class NGSIPostgisSinkTest {
         NGSIEvent ngsiEvent = new NGSIEvent(headers, contextElement.toString().getBytes(), contextElement, null);
         rowAggregator.initialize(ngsiEvent);
         rowAggregator.aggregate(ngsiEvent);
-        if (rowAggregator.getValuesForInsert().contains("'2','[]'")  &&
-                rowAggregator.getValuesForInsert().contains("'true','[]'")  &&
-                rowAggregator.getValuesForInsert().contains("'2016-09-21T01:23:00.00Z'")  &&
-                rowAggregator.getValuesForInsert().contains("{\"type\": \"Point\",\"coordinates\": [-0.036177,39.986159]}")  &&
-                rowAggregator.getValuesForInsert().contains("{\"String\": \"string\"}")  &&
-                rowAggregator.getValuesForInsert().contains("foo")) {
+        String valuesForInsert = rowAggregator.getValuesForInsert(OPEN_ENTITY_CHAR, CLOSE_ENTITY_CHAR, SEPARATOR_CHAR, QUOTATION_MARK_CHAR);
+        if (valuesForInsert.contains("'2','[]'")  &&
+                valuesForInsert.contains("'true','[]'")  &&
+                valuesForInsert.contains("'2016-09-21T01:23:00.00Z'")  &&
+                valuesForInsert.contains("{\"type\": \"Point\",\"coordinates\": [-0.036177,39.986159]}")  &&
+                valuesForInsert.contains("{\"String\": \"string\"}")  &&
+                valuesForInsert.contains("foo")) {
             System.out.println(getTestTraceHead("[NGSIPostgisSink.testNativeTypesRow]")
                     + "-  OK  - NativeTypesOK");
             assertTrue(true);
         } else {
-            assertFalse(true);
+            fail();
         }
     }
 
@@ -1250,9 +1258,9 @@ public class NGSIPostgisSinkTest {
                 for (NGSIEvent event : events) {
                     aggregator.aggregate(event);
                 } // for
-                String correctBatch = "('2016-04-20 07:19:55.801','somePath','someId','someType',2,'[]',TRUE,'[]','2016-09-21T01:23:00.00Z','[]',ST_GeomFromGeoJSON('\"{\"type\": \"Point\",\"coordinates\": [-0.036177,39.986159]}\"'),'[]','{\"String\": \"string\"}','[]','foo','[]','','[]',NULL,NULL,NULL,NULL),('2016-04-20 07:19:55.801','somePath','someId','someType',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,ST_SetSRID(ST_MakePoint(\"-3.7167::double precision , 40.3833\"::double precision ), 4326),'[{\"name\":\"location\",\"type\":\"string\",\"value\":\"WGS84\"}]','someValue2','[]')";
-                System.out.println(aggregator.getValuesForInsert());
-                if (aggregator.getValuesForInsert().equals(correctBatch)) {
+                String correctBatch = "('2016-04-20 07:19:55.801','somePath','someId','someType',2,'[]',TRUE,'[]','2016-09-21T01:23:00.00Z','[]',ST_GeomFromGeoJSON('\"{\"type\": \"Point\",\"coordinates\": [-0.036177,39.986159]}\"'),'[]','{\"String\": \"string\"}','[]','foo','[]','','[]',NULL,NULL,NULL,NULL),('2016-04-20 07:19:55.801','somePath','someId','someType',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,ST_SetSRID(ST_MakePoint(\"-3.7167::double precision , 40.3833\"::double precision ), 4326),'[{\"name\":\"location\",\"type\":\"string\",\"value\":\"WGS84\"}]','someValue2','[]')";String valuesForInsert = aggregator.getValuesForInsert(OPEN_ENTITY_CHAR, CLOSE_ENTITY_CHAR, SEPARATOR_CHAR, QUOTATION_MARK_CHAR);
+                System.out.println(valuesForInsert);
+                if (valuesForInsert.equals(correctBatch)) {
                     System.out.println(getTestTraceHead("[NGSIPostgisSink.testNativeTypesColumnBatch]")
                             + "-  OK  - NativeTypesOK");
                     assertTrue(true);

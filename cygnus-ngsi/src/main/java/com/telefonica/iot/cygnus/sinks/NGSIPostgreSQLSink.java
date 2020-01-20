@@ -65,6 +65,10 @@ public class NGSIPostgreSQLSink extends NGSISink {
     private static final String DEFAULT_ENABLE_CACHE = "false";
     private static final int DEFAULT_MAX_POOL_SIZE = 3;
     private static final String DEFAULT_ATTR_NATIVE_TYPES = "false";
+    private static final String OPEN_ENTITY_CHAR = "(";
+    private static final String CLOSE_ENTITY_CHAR = ")";
+    private static final String SEPARATOR_CHAR = ",";
+    private static final String QUOTATION_MARK_CHAR = "";
 
     private static final CygnusLogger LOGGER = new CygnusLogger(NGSIPostgreSQLSink.class);
     private String postgresqlHost;
@@ -369,7 +373,7 @@ public class NGSIPostgreSQLSink extends NGSISink {
     private void persistAggregation(NGSIGenericAggregator aggregator) throws CygnusPersistenceError, CygnusRuntimeError, CygnusBadContextData {
         String fieldsForCreate = aggregator.getFieldsForCreate();
         String fieldsForInsert = aggregator.getFieldsForInsert();
-        String valuesForInsert = aggregator.getValuesForInsert();
+        String valuesForInsert = aggregator.getValuesForInsert(OPEN_ENTITY_CHAR, CLOSE_ENTITY_CHAR, SEPARATOR_CHAR, QUOTATION_MARK_CHAR) + ")";
         String schemaName = aggregator.getTableName(enableLowercase);
         String tableName = aggregator.getTableName(enableLowercase);
 

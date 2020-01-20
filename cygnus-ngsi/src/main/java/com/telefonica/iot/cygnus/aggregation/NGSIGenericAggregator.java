@@ -144,7 +144,7 @@ public abstract class NGSIGenericAggregator {
      * @param value the value
      * @return the string value for json element
      */
-    public String getStringValueForJsonElement(JsonElement value) {
+    public String getStringValueForJsonElement(JsonElement value, String quotationMark) {
         String stringValue;
         if (attrNativeTypes) {
             if (value == null || value.isJsonNull()) {
@@ -158,17 +158,17 @@ public abstract class NGSIGenericAggregator {
                     if (value.toString().contains("ST_GeomFromGeoJSON") || value.toString().contains("ST_SetSRID")) {
                         stringValue = value.getAsString().replace("\\", "");
                     } else {
-                        stringValue = "'" + value.getAsString() + "'";
+                        stringValue = quotationMark + value.getAsString() + quotationMark;
                     }
                 }
             } else {
-                stringValue = "'" + value.toString() + "'";
+                stringValue = quotationMark + value.toString() + quotationMark;
             }
         } else {
             if (value.isJsonPrimitive()) {
-                stringValue = "'" + value.getAsString() + "'";
+                stringValue = quotationMark + value.getAsString() + quotationMark;
             } else {
-                stringValue = "'" + value.toString() + "'";
+                stringValue = quotationMark + value.toString() + quotationMark;
             }
         }
         LOGGER.debug("[" + getName() + "] aggregation entry = "  + stringValue);
@@ -180,15 +180,15 @@ public abstract class NGSIGenericAggregator {
      *
      * @return the values for insert
      */
-    public String getValuesForInsert() {
+    public String getValuesForInsert(String openEntity, String closeEntity, String separator, String quotationMark) {
         String valuesForInsert = "";
         int numEvents = aggregation.get(NGSIConstants.FIWARE_SERVICE_PATH).size();
 
         for (int i = 0; i < numEvents; i++) {
             if (i == 0) {
-                valuesForInsert += "(";
+                valuesForInsert += openEntity;
             } else {
-                valuesForInsert += ",(";
+                valuesForInsert += separator + openEntity;
             } // if else
             boolean first = true;
             Iterator<String> it = aggregation.keySet().iterator();
@@ -196,15 +196,15 @@ public abstract class NGSIGenericAggregator {
                 String entry = (String) it.next();
                 ArrayList<JsonElement> values = (ArrayList<JsonElement>) aggregation.get(entry);
                 JsonElement value = values.get(i);
-                String stringValue = getStringValueForJsonElement(value);
+                String stringValue = getStringValueForJsonElement(value, quotationMark);
                 if (first) {
                     valuesForInsert += stringValue;
                     first = false;
                 } else {
-                    valuesForInsert += "," + stringValue;
+                    valuesForInsert += separator + stringValue;
                 } // if else
             } // while
-            valuesForInsert += ")";
+            valuesForInsert += closeEntity;
         } // for
         return valuesForInsert;
     } // getValuesForInsert
