@@ -18,6 +18,10 @@
 
 package com.telefonica.iot.cygnus.sinks;
 
+import com.google.gson.JsonElement;
+import com.telefonica.iot.cygnus.aggregation.NGSIGenericAggregator;
+import com.telefonica.iot.cygnus.aggregation.NGSIGenericColumnAggregator;
+import com.telefonica.iot.cygnus.aggregation.NGSIGenericRowAggregator;
 import com.telefonica.iot.cygnus.backends.ckan.CKANBackendImpl;
 import com.telefonica.iot.cygnus.backends.ckan.CKANBackend;
 import com.telefonica.iot.cygnus.containers.NotifyContextRequest;
@@ -35,6 +39,7 @@ import com.telefonica.iot.cygnus.utils.NGSICharsets;
 import com.telefonica.iot.cygnus.utils.NGSIConstants;
 import com.telefonica.iot.cygnus.utils.NGSIUtils;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.Locale;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.flume.Context;
@@ -263,7 +268,7 @@ public class NGSICKANSink extends NGSISink {
             String servicePath = firstEvent.getServicePathForData();
 
             // Get an aggregator for this entity and initialize it based on the first event
-            CKANAggregator aggregator = getAggregator(this.rowAttrPersistence);
+            NGSIGenericAggregator aggregator = getAggregator(this.rowAttrPersistence);
             aggregator.initialize(firstEvent);
 
             for (NGSIEvent event : events) {
@@ -329,204 +334,132 @@ public class NGSICKANSink extends NGSISink {
     } // truncateByTime
 
     /**
-     * Class for aggregating fieldValues.
-     */
-    protected abstract class CKANAggregator {
-
-        // string containing the data records
-        protected String records;
-
-        protected String service;
-        protected String servicePathForData;
-        protected String servicePathForNaming;
-        protected String entityForNaming;
-        protected String orgName;
-        protected String pkgName;
-        protected String resName;
-        protected String resId;
-
-        public CKANAggregator() {
-            records = "";
-        } // CKANAggregator
-
-        public String getAggregation() {
-            return records;
-        } // getAggregation
-
-        public String getOrgName(boolean enableLowercase) {
-            if (enableLowercase) {
-                return orgName.toLowerCase();
-            } else {
-                return orgName;
-            } // if else
-        } // getOrgName
-
-        public String getPkgName(boolean enableLowercase) {
-            if (enableLowercase) {
-                return pkgName.toLowerCase();
-            } else {
-                return pkgName;
-            } // if else
-        } // getPkgName
-
-        public String getResName(boolean enableLowercase) {
-            if (enableLowercase) {
-                return resName.toLowerCase();
-            } else {
-                return resName;
-            } // if else
-        } // getResName
-
-        public void initialize(NGSIEvent event) throws CygnusBadConfiguration {
-            service = event.getServiceForNaming(enableNameMappings);
-            servicePathForData = event.getServicePathForData();
-            servicePathForNaming = event.getServicePathForNaming(enableGrouping, enableNameMappings);
-            entityForNaming = event.getEntityForNaming(enableGrouping, enableNameMappings, enableEncoding);
-            orgName = buildOrgName(service);
-            pkgName = buildPkgName(service, servicePathForNaming);
-            resName = buildResName(entityForNaming);
-        } // initialize
-
-        public abstract void aggregate(NGSIEvent cygnusEvent);
-
-    } // CKANAggregator
-
-    /**
      * Class for aggregating batches in row mode.
      */
-    protected class RowAggregator extends CKANAggregator {
+    protected class RowAggregator extends NGSIGenericRowAggregator {
+
+        /**
+         * Instantiates a new Ngsi generic row aggregator.
+         *
+         * @param enableGrouping     the enable grouping flag for initialization
+         * @param enableNameMappings the enable name mappings flag for initialization
+         * @param enableEncoding     the enable encoding flag for initialization
+         * @param enableGeoParse     the enable geo parse flag for initialization
+         */
+        protected RowAggregator(boolean enableGrouping, boolean enableNameMappings, boolean enableEncoding, boolean enableGeoParse) {
+            super(enableGrouping, enableNameMappings, enableEncoding, enableGeoParse, attrNativeTypes);
+        }
 
         @Override
         public void initialize(NGSIEvent event) throws CygnusBadConfiguration {
             super.initialize(event);
+            setOrgName(buildOrgName(event.getServiceForNaming(enableNameMappings)));
+            setPkgName(buildPkgName(event.getServiceForNaming(enableNameMappings), event.getServicePathForNaming(enableGrouping, enableNameMappings)));
+            setResName(buildResName(event.getEntityForNaming(enableGrouping, enableNameMappings, enableEncoding)));
         } // initialize
 
-        @Override
-        public void aggregate(NGSIEvent event) {
-            // get the getRecvTimeTs headers
-            long recvTimeTs = event.getRecvTimeTs();
-            String recvTime = CommonUtils.getHumanReadable(recvTimeTs, true);
-
-            // get the getRecvTimeTs body
-            NotifyContextRequest.ContextElement contextElement = event.getContextElement();
-            String entityId = contextElement.getId();
-            String entityType = contextElement.getType();
-            LOGGER.debug("[" + getName() + "] Processing context element (id=" + entityId + ", type="
-                    + entityType + ")");
-
-            // iterate on all this context element attributes, if there are attributes
-            ArrayList<NotifyContextRequest.ContextAttribute> contextAttributes = contextElement.getAttributes();
-
-            if (contextAttributes == null || contextAttributes.isEmpty()) {
-                LOGGER.warn("No attributes within the notified entity, nothing is done (id=" + entityId
-                        + ", type=" + entityType + ")");
-                return;
-            } // if
-
-            for (NotifyContextRequest.ContextAttribute contextAttribute : contextAttributes) {
-                String attrName = contextAttribute.getName();
-                String attrType = contextAttribute.getType();
-                String attrValue = contextAttribute.getContextValue(true);
-                String attrMetadata = contextAttribute.getContextMetadata();
-                LOGGER.debug("[" + getName() + "] Processing context attribute (name=" + attrName + ", type="
-                        + attrType + ")");
-
-                // create a column and aggregate it
-                String record = "{\"" + NGSIConstants.RECV_TIME_TS + "\": \"" + recvTimeTs / 1000 + "\","
-                    + "\"" + NGSIConstants.RECV_TIME + "\": \"" + recvTime + "\","
-                    + "\"" + NGSIConstants.FIWARE_SERVICE_PATH + "\": \"" + servicePathForData + "\","
-                    + "\"" + NGSIConstants.ENTITY_ID + "\": \"" + entityId + "\","
-                    + "\"" + NGSIConstants.ENTITY_TYPE + "\": \"" + entityType + "\","
-                    + "\"" + NGSIConstants.ATTR_NAME + "\": \"" + attrName + "\","
-                    + "\"" + NGSIConstants.ATTR_TYPE + "\": \"" + attrType + "\""
-                    + (isSpecialValue(attrValue) ? "" : ",\"" + NGSIConstants.ATTR_VALUE + "\": " + attrValue)
-                    + (isSpecialMetadata(attrMetadata) ? "" : ",\"" + NGSIConstants.ATTR_MD + "\": " + attrMetadata)
-                    + "}";
-
+        public String getRecords () {
+            String records = null;
+            String record = null;
+            int numEvents = getAggregation().get(NGSIConstants.FIWARE_SERVICE_PATH).size();
+            for (int i = 0; i < numEvents; i++) {
+                // Since all objects on aggregation method are inside a Linked hash map, it's necesary to get all values from this LinkedHashMap by getAggregation(key).
+                // In this case values are stored on key  NGSIConstants.SOMETHING and position i.
+                record = "{\"" + NGSIConstants.RECV_TIME_TS + "\": \"" + Long.parseLong(getStringValueForJsonElement(getAggregation().get(NGSIConstants.RECV_TIME_TS).get(i), QUOTATION_MARK_CHAR))/ 1000 + "\","
+                        + "\"" + NGSIConstants.RECV_TIME + "\": \"" + getStringValueForJsonElement(getAggregation().get(NGSIConstants.RECV_TIME).get(i), QUOTATION_MARK_CHAR) + "\","
+                        + "\"" + NGSIConstants.FIWARE_SERVICE_PATH + "\": \"" + getStringValueForJsonElement(getAggregation().get(NGSIConstants.FIWARE_SERVICE_PATH).get(i), QUOTATION_MARK_CHAR) + "\","
+                        + "\"" + NGSIConstants.ENTITY_ID + "\": \"" + getStringValueForJsonElement(getAggregation().get(NGSIConstants.ENTITY_ID).get(i), QUOTATION_MARK_CHAR) + "\","
+                        + "\"" + NGSIConstants.ENTITY_TYPE + "\": \"" + getStringValueForJsonElement(getAggregation().get(NGSIConstants.ENTITY_TYPE).get(i), QUOTATION_MARK_CHAR) + "\","
+                        + "\"" + NGSIConstants.ATTR_NAME + "\": \"" + getStringValueForJsonElement(getAggregation().get(NGSIConstants.ATTR_NAME).get(i), QUOTATION_MARK_CHAR) + "\","
+                        + "\"" + NGSIConstants.ATTR_TYPE + "\": \"" + getStringValueForJsonElement(getAggregation().get(NGSIConstants.ATTR_TYPE).get(i), QUOTATION_MARK_CHAR) + "\""
+                        + (isSpecialValue(getStringValueForJsonElement(getAggregation().get(NGSIConstants.ATTR_VALUE).get(i), QUOTATION_MARK_CHAR)) ? "" : ",\"" + NGSIConstants.ATTR_VALUE + "\": " + getStringValueForJsonElement(getAggregation().get(NGSIConstants.ATTR_VALUE).get(i), QUOTATION_MARK_CHAR))
+                        + (isSpecialMetadata(getStringValueForJsonElement(getAggregation().get(NGSIConstants.ATTR_MD).get(i), QUOTATION_MARK_CHAR)) ? "" : ",\"" + NGSIConstants.ATTR_MD + "\": " + getStringValueForJsonElement(getAggregation().get(NGSIConstants.ATTR_MD).get(i), QUOTATION_MARK_CHAR))
+                        + "}";
                 if (records.isEmpty()) {
                     records += record;
                 } else {
                     records += "," + record;
                 } // if else
             } // for
-        } // aggregate
+            return records;
+        }
 
     } // RowAggregator
 
     /**
      * Class for aggregating batches in column mode.
      */
-    protected class ColumnAggregator extends CKANAggregator {
+    protected class ColumnAggregator extends NGSIGenericColumnAggregator {
+
+        /**
+         * Instantiates a new Ngsi generic column aggregator.
+         *
+         * @param enableGrouping     the enable grouping
+         * @param enableNameMappings the enable name mappings
+         * @param enableEncoding     the enable encoding
+         * @param enableGeoParse     the enable geo parse
+         */
+        public ColumnAggregator(boolean enableGrouping, boolean enableNameMappings, boolean enableEncoding, boolean enableGeoParse) {
+            super(enableGrouping, enableNameMappings, enableEncoding, enableGeoParse, attrNativeTypes);
+        }
 
         @Override
         public void initialize(NGSIEvent event) throws CygnusBadConfiguration {
             super.initialize(event);
+            setOrgName(buildOrgName(event.getServiceForNaming(enableNameMappings)));
+            setPkgName(buildPkgName(event.getServiceForNaming(enableNameMappings), event.getServicePathForNaming(enableGrouping, enableNameMappings)));
+            setResName(buildResName(event.getEntityForNaming(enableGrouping, enableNameMappings, enableEncoding)));
         } // initialize
 
-        @Override
-        public void aggregate(NGSIEvent event) {
-            // get the getRecvTimeTs headers
-            long recvTimeTs = event.getRecvTimeTs();
-            String recvTime = CommonUtils.getHumanReadable(recvTimeTs, true);
-
-            // get the getRecvTimeTs body
-            NotifyContextRequest.ContextElement contextElement = event.getContextElement();
-            String entityId = contextElement.getId();
-            String entityType = contextElement.getType();
-            LOGGER.debug("[" + getName() + "] Processing context element (id=" + entityId + ", type="
-                    + entityType + ")");
-
-            // iterate on all this context element attributes, if there are attributes
-            ArrayList<NotifyContextRequest.ContextAttribute> contextAttributes = contextElement.getAttributes();
-
-            if (contextAttributes == null || contextAttributes.isEmpty()) {
-                LOGGER.warn("No attributes within the notified entity, nothing is done (id=" + entityId
-                        + ", type=" + entityType + ")");
-                return;
-            } // if
-
-            String record = "{\"" + NGSIConstants.RECV_TIME + "\": \"" + recvTime + "\","
-                    + "\"" + NGSIConstants.FIWARE_SERVICE_PATH + "\": \"" + servicePathForData + "\","
-                    + "\"" + NGSIConstants.ENTITY_ID + "\": \"" + entityId + "\","
-                    + "\"" + NGSIConstants.ENTITY_TYPE + "\": \"" + entityType + "\"";
-
-            for (NotifyContextRequest.ContextAttribute contextAttribute : contextAttributes) {
-                String attrName = contextAttribute.getName();
-                String attrType = contextAttribute.getType();
-                String attrValue = contextAttribute.getContextValue(true);
-                String attrMetadata = contextAttribute.getContextMetadata();
-                LOGGER.debug("[" + getName() + "] Processing context attribute (name=" + attrName + ", type="
-                        + attrType + ")");
-
-                // create part of the column with the current attribute (a.k.a. a column)
-                record += (isSpecialValue(attrValue) ? "" : ",\"" + attrName + "\": " + attrValue)
-                        + (isSpecialMetadata(attrMetadata) ? "" : ",\"" + attrName + "_md\": " + attrMetadata);
-            } // for
-
-            // now, aggregate the column
-            if (records.isEmpty()) {
-                records += record + "}";
-            } else {
-                records += "," + record + "}";
-            } // if else
-        } // aggregate
+        public String getRecords () {
+            String records = "";
+            int numEvents = getAggregation().get(NGSIConstants.FIWARE_SERVICE_PATH).size();
+            for (int i = 0; i < numEvents; i++) {
+                String record = "{\"" + NGSIConstants.RECV_TIME + "\": \"" + getStringValueForJsonElement(getAggregation().get(NGSIConstants.RECV_TIME).get(i), QUOTATION_MARK_CHAR) + "\","
+                        + "\"" + NGSIConstants.FIWARE_SERVICE_PATH + "\": \"" + getStringValueForJsonElement(getAggregation().get(NGSIConstants.FIWARE_SERVICE_PATH).get(i), QUOTATION_MARK_CHAR) + "\","
+                        + "\"" + NGSIConstants.ENTITY_ID + "\": \"" + getStringValueForJsonElement(getAggregation().get(NGSIConstants.ENTITY_ID).get(i), QUOTATION_MARK_CHAR) + "\","
+                        + "\"" + NGSIConstants.ENTITY_TYPE + "\": \"" + getStringValueForJsonElement(getAggregation().get(NGSIConstants.ENTITY_TYPE).get(i), QUOTATION_MARK_CHAR) + "\"";
+                Iterator<String> it = aggregation.keySet().iterator();
+                while (it.hasNext()) {
+                    String entry = (String) it.next();
+                    ArrayList<JsonElement> values = (ArrayList<JsonElement>) aggregation.get(entry);
+                    JsonElement value = values.get(i);
+                    String stringValue = getStringValueForJsonElement(value, QUOTATION_MARK_CHAR);
+                    if (stringValue != null && !entry.equals(NGSIConstants.RECV_TIME) && !entry.equals(NGSIConstants.ENTITY_ID) && !entry.equals(NGSIConstants.ENTITY_TYPE)) {
+                        record += (isSpecialValue(stringValue) ? "" : ",\"" + entry + "\": " + stringValue);
+                    }
+                }
+                if (records.isEmpty()) {
+                    records += record + "}";
+                } else {
+                    records += "," + record + "}";
+                } // if else
+            }
+            return records;
+        }
 
     } // ColumnAggregator
 
-    protected CKANAggregator getAggregator(boolean rowAttrPersistence) {
+    protected NGSIGenericAggregator getAggregator(boolean rowAttrPersistence) {
         if (rowAttrPersistence) {
-            return new RowAggregator();
+            return new RowAggregator(enableGrouping, enableNameMappings, enableEncoding, false);
         } else {
-            return new ColumnAggregator();
+            return new ColumnAggregator(enableGrouping, enableNameMappings, enableEncoding, false);
         } // if else
     } // getAggregator
 
-    private void persistAggregation(CKANAggregator aggregator, String service, String servicePath)
+    private void persistAggregation(NGSIGenericAggregator aggregator, String service, String servicePath)
         throws CygnusBadConfiguration, CygnusRuntimeError, CygnusPersistenceError {
-        String aggregation = aggregator.getAggregation();
-        String orgName = aggregator.getOrgName(enableLowercase);
-        String pkgName = aggregator.getPkgName(enableLowercase);
-        String resName = aggregator.getResName(enableLowercase);
+        String aggregation = "";
+        String orgName = aggregator.getOrgName().toLowerCase();
+        String pkgName = aggregator.getPkgName().toLowerCase();
+        String resName = aggregator.getResName().toLowerCase();
+
+        if (rowAttrPersistence && aggregator instanceof RowAggregator) {
+            aggregation = ((RowAggregator) aggregator).getRecords();
+        } else {
+            aggregation = ((ColumnAggregator) aggregator).getRecords();
+        }
 
         LOGGER.info("[" + this.getName() + "] Persisting data at NGSICKANSink (orgName=" + orgName
                 + ", pkgName=" + pkgName + ", resName=" + resName + ", data=" + aggregation + ")");

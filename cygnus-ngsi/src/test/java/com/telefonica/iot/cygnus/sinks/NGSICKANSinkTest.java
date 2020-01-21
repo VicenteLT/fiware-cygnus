@@ -1181,7 +1181,7 @@ public class NGSICKANSinkTest {
 
     @Test
     public void testNativeTypeColumnFalse() throws CygnusBadConfiguration {
-        String attr_native_types = "false"; // default
+        String attr_native_types = "true"; // default
         NGSICKANSink ngsickanSink = new NGSICKANSink();
         ngsickanSink.configure(createContextforNativeTypes(null, null, null, null, null, null, null, null, null, null, null, null, null, attr_native_types));
         // Create a NGSIEvent
@@ -1200,13 +1200,14 @@ public class NGSICKANSinkTest {
         headers.put(CommonConstants.HEADER_FIWARE_SERVICE_PATH, originalServicePath);
         headers.put(NGSIConstants.FLUME_HEADER_MAPPED_SERVICE, mappedService);
         headers.put(NGSIConstants.FLUME_HEADER_MAPPED_SERVICE_PATH, mappedServicePath);
-        //NGSICKANSink.ColumnAggregator columnAggregator = ngsickanSink.new ColumnAggregator(false, false, false, false);
-        NGSICKANSink.ColumnAggregator columnAggregator = ngsickanSink.new ColumnAggregator();
+        NGSICKANSink.ColumnAggregator columnAggregator = ngsickanSink.new ColumnAggregator(false, false, false, false);
+        //NGSICKANSink.ColumnAggregator columnAggregator = ngsickanSink.new ColumnAggregator();
         NotifyContextRequest.ContextElement contextElement = createContextElementForNativeTypes();
         NGSIEvent ngsiEvent = new NGSIEvent(headers, contextElement.toString().getBytes(), contextElement, null);
         columnAggregator.initialize(ngsiEvent);
         columnAggregator.aggregate(ngsiEvent);
-        System.out.println(columnAggregator.getAggregation());
+        System.out.println(columnAggregator.aggregationToJson());
+        System.out.println(columnAggregator.getRecords());
 
     }//testNativeTypeColumnFalse
 
@@ -1244,12 +1245,12 @@ public class NGSICKANSinkTest {
             while (batch.hasNext()) {
                 destination = batch.getNextDestination();
                 ArrayList<NGSIEvent> events = batch.getNextEvents();
-                NGSICKANSink.CKANAggregator aggregator = ngsickanSink.getAggregator(false);
+                NGSIGenericAggregator aggregator = ngsickanSink.getAggregator(false);
                 aggregator.initialize(events.get(0));
                 for (NGSIEvent event : events) {
                     aggregator.aggregate(event);
                 } // for
-                System.out.println(aggregator.getAggregation());
+                System.out.println(aggregator.aggregationToJson());
             }
         } catch (Exception e) {
             System.out.println(e);
@@ -1278,13 +1279,13 @@ public class NGSICKANSinkTest {
         headers.put(CommonConstants.HEADER_FIWARE_SERVICE_PATH, originalServicePath);
         headers.put(NGSIConstants.FLUME_HEADER_MAPPED_SERVICE, mappedService);
         headers.put(NGSIConstants.FLUME_HEADER_MAPPED_SERVICE_PATH, mappedServicePath);
-        //NGSICKANSink.RowAggregator rowAggregator = ngsickanSink.new RowAggregator(false, false,false,true);
-        NGSICKANSink.RowAggregator rowAggregator = ngsickanSink.new RowAggregator();
+        NGSICKANSink.RowAggregator rowAggregator = ngsickanSink.new RowAggregator(false, false,false,true);
+        //NGSICKANSink.RowAggregator rowAggregator = ngsickanSink.new RowAggregator();
         NotifyContextRequest.ContextElement contextElement = createContextElementForNativeTypes();
         NGSIEvent ngsiEvent = new NGSIEvent(headers, contextElement.toString().getBytes(), contextElement, null);
         rowAggregator.initialize(ngsiEvent);
         rowAggregator.aggregate(ngsiEvent);
-        System.out.println(rowAggregator.getAggregation());
+        System.out.println(rowAggregator.aggregationToJson());
 
     }
 

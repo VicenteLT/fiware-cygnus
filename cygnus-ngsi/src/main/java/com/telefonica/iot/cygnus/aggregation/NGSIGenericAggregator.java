@@ -54,6 +54,9 @@ public abstract class NGSIGenericAggregator {
     private String attribute;
     private String dbName;
     private String tableName;
+    protected String orgName;
+    protected String pkgName;
+    protected String resName;
 
     /**
      * Instantiates a new Ngsi generic aggregator.
@@ -138,6 +141,61 @@ public abstract class NGSIGenericAggregator {
         this.tableName = tableName;
     }
 
+
+    /**
+     * Gets org name.
+     *
+     * @return the org name
+     */
+    public String getOrgName() {
+        return orgName;
+    }
+
+    /**
+     * Sets org name.
+     *
+     * @param orgName the org name
+     */
+    public void setOrgName(String orgName) {
+        this.orgName = orgName;
+    }
+
+    /**
+     * Gets pkg name.
+     *
+     * @return the pkg name
+     */
+    public String getPkgName() {
+        return pkgName;
+    }
+
+    /**
+     * Sets pkg name.
+     *
+     * @param pkgName the pkg name
+     */
+    public void setPkgName(String pkgName) {
+        this.pkgName = pkgName;
+    }
+
+    /**
+     * Gets res name.
+     *
+     * @return the res name
+     */
+    public String getResName() {
+        return resName;
+    }
+
+    /**
+     * Sets res name.
+     *
+     * @param resName the res name
+     */
+    public void setResName(String resName) {
+        this.resName = resName;
+    }
+
     /**
      * Gets string value for json element.
      *
@@ -211,6 +269,36 @@ public abstract class NGSIGenericAggregator {
 
     private String getName() {
         return "NGSIUtils.GenericAggregator";
+    }
+
+    public String aggregationToJson() {
+        String json = "";
+        int numEvents = getAggregation().get(NGSIConstants.FIWARE_SERVICE_PATH).size();
+        for (int i = 0; i < numEvents; i++) {
+            String record = "";
+            if (json.isEmpty()) {
+                record = "{";
+            } else {
+                record += "," + record + "{";
+            } // if else
+            Iterator<String> it = aggregation.keySet().iterator();
+            while (it.hasNext()) {
+                String entry = (String) it.next();
+                ArrayList<JsonElement> values = (ArrayList<JsonElement>) aggregation.get(entry);
+                JsonElement value = values.get(i);
+                String stringValue = getStringValueForJsonElement(value, "\"");
+                if (!record.equals("{")) {
+                    record += ",";
+                }
+                record += entry + " : " + stringValue;
+            }
+            if (json.isEmpty()) {
+                json += record + "}";
+            } else {
+                json += "," + record + "}";
+            } // if else
+        }
+        return json;
     }
 
     /**
