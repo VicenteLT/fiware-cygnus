@@ -413,9 +413,13 @@ public abstract class NGSISink extends CygnusSink implements Configurable {
         updateServiceMetrics(batch, false);
 
         if (!rollbackedAccumulation.getAccTransactionIds().isEmpty()) {
-            LOGGER.info("Finishing internal transaction (" + rollbackedAccumulation.getAccTransactionIds() + ")");
+            String correlatorIdArray [] = rollbackedAccumulation.getAccTransactionIds().split(",");
+            for (String correlatorId: correlatorIdArray) {
+                MDC.put(CommonConstants.LOG4J_CORR, correlatorId);
+                LOGGER.info("Finishing internal transaction");
+                setMDCToNA();
+            }
         } // if
-
         rollbackedAccumulations.remove(0);
         numPersistedEvents += rollbackedAccumulation.getBatch().getNumEvents();
         setMDCToNA();
